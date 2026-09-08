@@ -1,0 +1,4 @@
+interface:
+  display_name: "Confirm Before Work"
+  short_description: "Restate first, then wait"
+  default_prompt: "Use $confirm-before-work before any file write: restate the target files, intended change, assumptions, boundaries, and open questions, then wait for my confirmation."
