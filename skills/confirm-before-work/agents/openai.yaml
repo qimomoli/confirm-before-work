@@ -1,4 +1,4 @@
 interface:
   display_name: "Confirm Before Work"
-  short_description: "Restate first, then wait"
-  default_prompt: "Use $confirm-before-work before any file write: restate the target files, intended change, assumptions, boundaries, and open questions, then wait for my confirmation."
+  short_description: "Confirm scope before every write"
+  default_prompt: "Use $confirm-before-work before any direct or indirect file-system mutation: restate the action, target files or bounded patterns, intended change, likely side effects, assumptions, boundaries, and open questions, then wait for explicit confirmation. Ask again if the approved scope changes."
