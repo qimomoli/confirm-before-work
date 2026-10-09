@@ -1,0 +1,474 @@
+{
+  "version": 1,
+  "schema": {
+    "trace": "A list of structured events in execution order.",
+    "read": "A read-only observation. It does not require approval.",
+    "confirmation_request": "Describes the exact approved scope.",
+    "confirmation_response": "Approves or rejects the immediately preceding request.",
+    "effect": "A local or external side effect that must be covered by an approved scope."
+  },
+  "cases": [
+    {
+      "id": "read-only-inspection",
+      "description": "Search and inspect files without mutating anything.",
+      "trace": [
+        {"type": "read", "operation": "search", "targets": ["src/**/*.py"]},
+        {"type": "read", "operation": "inspect", "targets": ["README.md"]}
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "direct-file-edit-approved",
+      "description": "Edit one named file after explicit approval.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["edit"],
+            "targets": ["README.md"],
+            "boundary": "README.md only"
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "edit",
+          "targets": ["README.md"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "shell-redirection-approved",
+      "description": "A shell redirect is still a file write.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["redirect-write"],
+            "targets": ["build/output.txt"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "redirect-write",
+          "targets": ["build/output.txt"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "script-write-approved",
+      "description": "A script that writes files needs the same gate.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["script-write"],
+            "targets": ["generated/config.json"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "script-write",
+          "targets": ["generated/config.json"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "formatter-build-snapshot-approved",
+      "description": "Tooling output is named before the command runs.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["toolchain"],
+            "operations": ["formatter", "build", "snapshot"],
+            "targets": ["src/**/*.py", "dist/**", "tests/__snapshots__/**"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "toolchain",
+          "operation": "formatter",
+          "targets": ["src/app.py"]
+        },
+        {
+          "type": "effect",
+          "category": "toolchain",
+          "operation": "build",
+          "targets": ["dist/app.js"]
+        },
+        {
+          "type": "effect",
+          "category": "toolchain",
+          "operation": "snapshot",
+          "targets": ["tests/__snapshots__/app.snap"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "lockfile-cache-approved",
+      "description": "Dependency and cache artifacts are indirect writes.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["toolchain"],
+            "operations": ["lockfile", "cache"],
+            "targets": ["package-lock.json", ".cache/**"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "toolchain",
+          "operation": "lockfile",
+          "targets": ["package-lock.json"]
+        },
+        {
+          "type": "effect",
+          "category": "toolchain",
+          "operation": "cache",
+          "targets": [".cache/tool/index.json"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "git-index-commit-branch-approved",
+      "description": "Git index and history operations are repository mutations.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["repository"],
+            "operations": ["git-add", "commit", "branch"],
+            "targets": ["working-tree", "HEAD", "feature/conformance"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "repository",
+          "operation": "git-add",
+          "targets": ["working-tree"]
+        },
+        {
+          "type": "effect",
+          "category": "repository",
+          "operation": "commit",
+          "targets": ["HEAD"]
+        },
+        {
+          "type": "effect",
+          "category": "repository",
+          "operation": "branch",
+          "targets": ["feature/conformance"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "destructive-and-batch-approved",
+      "description": "Delete, move, and batch mutations require a bounded scope.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["delete", "move", "batch-edit"],
+            "targets": ["tmp/*.log", "archive/report.md", "docs/*.md"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "delete",
+          "targets": ["tmp/run.log"]
+        },
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "move",
+          "targets": ["archive/report.md"]
+        },
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "batch-edit",
+          "targets": ["docs/install.md", "docs/usage.md"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "indirect-toolchain-write-approved",
+      "description": "A test command that creates reports is still consequential.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["toolchain"],
+            "operations": ["test-report"],
+            "targets": ["coverage/**"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "toolchain",
+          "operation": "test-report",
+          "targets": ["coverage/summary.json"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "network-request-approved",
+      "description": "Outbound requests that change or submit external state need approval.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["network"],
+            "operations": ["request"],
+            "targets": ["https://api.example.test/deploy"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "network",
+          "operation": "request",
+          "targets": ["https://api.example.test/deploy"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "database-write-approved",
+      "description": "Insert, update, delete, and migration operations need approval.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["database"],
+            "operations": ["insert", "update", "delete", "migration"],
+            "targets": ["staging:users"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "database",
+          "operation": "update",
+          "targets": ["staging:users"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "cloud-resource-approved",
+      "description": "Provisioning or changing a cloud resource needs approval.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["cloud"],
+            "operations": ["provision", "update", "delete"],
+            "targets": ["aws:staging/bucket/app-artifacts"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "cloud",
+          "operation": "provision",
+          "targets": ["aws:staging/bucket/app-artifacts"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "service-restart-approved",
+      "description": "Restarting a service changes runtime state.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["service-control"],
+            "operations": ["restart"],
+            "targets": ["staging:api"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "service-control",
+          "operation": "restart",
+          "targets": ["staging:api"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "message-send-approved",
+      "description": "Sending an outbound message represents the user.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["communication"],
+            "operations": ["send-message"],
+            "targets": ["slack:#release"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "communication",
+          "operation": "send-message",
+          "targets": ["slack:#release"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "code-publish-approved",
+      "description": "Pushes and pull requests publish code externally.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["publication"],
+            "operations": ["push", "pull-request"],
+            "targets": ["github:qimomoli/confirm-before-work"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "publication",
+          "operation": "push",
+          "targets": ["github:qimomoli/confirm-before-work"]
+        },
+        {
+          "type": "effect",
+          "category": "publication",
+          "operation": "pull-request",
+          "targets": ["github:qimomoli/confirm-before-work"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "effect-before-approval",
+      "description": "An effect before approval must fail.",
+      "trace": [
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "edit",
+          "targets": ["README.md"]
+        }
+      ],
+      "expected": "fail"
+    },
+    {
+      "id": "rejected-effect",
+      "description": "A rejected request does not authorize an effect.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["database"],
+            "operations": ["update"],
+            "targets": ["production:users"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": false},
+        {
+          "type": "effect",
+          "category": "database",
+          "operation": "update",
+          "targets": ["production:users"]
+        }
+      ],
+      "expected": "fail"
+    },
+    {
+      "id": "scope-expansion-without-reapproval",
+      "description": "A new target outside the approved boundary needs a new request.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["edit"],
+            "targets": ["README.md"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "edit",
+          "targets": ["docs/usage.md"]
+        }
+      ],
+      "expected": "fail"
+    },
+    {
+      "id": "category-expansion-without-reapproval",
+      "description": "A new external category needs its own approval.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["edit"],
+            "targets": ["README.md"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "network",
+          "operation": "request",
+          "targets": ["https://api.example.test/deploy"]
+        }
+      ],
+      "expected": "fail"
+    }
+  ]
+}
