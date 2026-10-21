@@ -58,9 +58,11 @@ Supported event types:
 - `effect`: records a local or external side effect.
 
 An effect passes only when every category, operation, and target is covered by
-an approved scope. A target may use shell-style `*` and `**` patterns. Effects
-before approval, rejected effects, and scope expansion without a new request
-fail.
+an approved scope. A target may use shell-style `*` and `**` patterns. For
+path-like targets, `*` stays within one path segment and `**` may span multiple
+segments. Parent-directory (`..`) segments and the unbounded target patterns
+`*`, `**`, and `**/*` are rejected. Effects before approval, rejected effects,
+and scope expansion without a new request fail.
 
 ## Covered Categories
 

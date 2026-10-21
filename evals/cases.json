@@ -448,6 +448,98 @@
       "expected": "fail"
     },
     {
+      "id": "recursive-double-star-approved",
+      "description": "A double-star target pattern may cover nested directories.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["edit"],
+            "targets": ["src/**/*.py"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "edit",
+          "targets": ["src/nested/app.py"]
+        }
+      ],
+      "expected": "pass"
+    },
+    {
+      "id": "single-star-does-not-cross-directory",
+      "description": "A single-star target pattern must not cover nested directories.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["edit"],
+            "targets": ["src/*.py"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "edit",
+          "targets": ["src/nested/app.py"]
+        }
+      ],
+      "expected": "fail"
+    },
+    {
+      "id": "target-traversal-is-rejected",
+      "description": "A target containing a parent-directory segment must not be authorized.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["edit"],
+            "targets": ["docs/*.md"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "edit",
+          "targets": ["docs/../../secret.md"]
+        }
+      ],
+      "expected": "fail"
+    },
+    {
+      "id": "unbounded-target-pattern-is-rejected",
+      "description": "A target pattern that authorizes every target is not a bounded scope.",
+      "trace": [
+        {
+          "type": "confirmation_request",
+          "id": "c1",
+          "scope": {
+            "categories": ["filesystem"],
+            "operations": ["edit"],
+            "targets": ["*"]
+          }
+        },
+        {"type": "confirmation_response", "request_id": "c1", "approved": true},
+        {
+          "type": "effect",
+          "category": "filesystem",
+          "operation": "edit",
+          "targets": ["README.md"]
+        }
+      ],
+      "expected": "fail"
+    },
+    {
       "id": "category-expansion-without-reapproval",
       "description": "A new external category needs its own approval.",
       "trace": [

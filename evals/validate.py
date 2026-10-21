@@ -7,11 +7,13 @@ import argparse
 import fnmatch
 import json
 import sys
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 
 EVENT_TYPES = {"read", "confirmation_request", "confirmation_response", "effect"}
+UNBOUNDED_TARGET_PATTERNS = {"*", "**", "**/*"}
 
 
 def _string_list(value: Any, field: str) -> list[str]:
@@ -27,10 +29,15 @@ def _scope_from_request(event: dict[str, Any]) -> dict[str, list[str]]:
     if not isinstance(scope, dict):
         raise ValueError("confirmation_request.scope must be an object")
 
+    targets = _normalize_targets(
+        _string_list(scope.get("targets"), "scope.targets"),
+        "scope.targets",
+        reject_unbounded=True,
+    )
     return {
         "categories": _string_list(scope.get("categories"), "scope.categories"),
         "operations": _string_list(scope.get("operations"), "scope.operations"),
-        "targets": _string_list(scope.get("targets"), "scope.targets"),
+        "targets": targets,
     }
 
 
@@ -44,16 +51,61 @@ def _effect_from_event(event: dict[str, Any]) -> dict[str, Any]:
     return {
         "category": category,
         "operation": operation,
-        "targets": _string_list(event.get("targets"), "effect.targets"),
+        "targets": _normalize_targets(
+            _string_list(event.get("targets"), "effect.targets"),
+            "effect.targets",
+        ),
     }
 
 
+def _normalize_targets(
+    targets: list[str], field: str, *, reject_unbounded: bool = False
+) -> list[str]:
+    normalized: list[str] = []
+    for target in targets:
+        value = target.replace("\\", "/")
+        if ".." in value.split("/"):
+            raise ValueError(f"{field} must not contain parent-directory segments")
+        candidate = value
+        while candidate.startswith("./"):
+            candidate = candidate[2:]
+        if reject_unbounded and candidate in UNBOUNDED_TARGET_PATTERNS:
+            raise ValueError(f"{field} must not contain unbounded target patterns")
+        normalized.append(value)
+    return normalized
+
+
 def _matches(value: str, patterns: list[str]) -> bool:
+    return any(pattern == "*" or fnmatch.fnmatchcase(value, pattern) for pattern in patterns)
+
+
+def _target_matches(value: str, patterns: list[str]) -> bool:
+    value_parts = tuple(value.split("/"))
+
     for pattern in patterns:
-        if pattern == "*" or fnmatch.fnmatchcase(value, pattern):
+        pattern_parts = tuple(pattern.split("/"))
+
+        @lru_cache(maxsize=None)
+        def matches(value_index: int, pattern_index: int) -> bool:
+            if pattern_index == len(pattern_parts):
+                return value_index == len(value_parts)
+
+            part = pattern_parts[pattern_index]
+            if part == "**":
+                return matches(value_index, pattern_index + 1) or (
+                    value_index < len(value_parts)
+                    and matches(value_index + 1, pattern_index)
+                )
+
+            return (
+                value_index < len(value_parts)
+                and fnmatch.fnmatchcase(value_parts[value_index], part)
+                and matches(value_index + 1, pattern_index + 1)
+            )
+
+        if matches(0, 0):
             return True
-        if "**/" in pattern and fnmatch.fnmatchcase(value, pattern.replace("**/", "")):
-            return True
+
     return False
 
 
@@ -61,7 +113,7 @@ def _covers(scope: dict[str, list[str]], effect: dict[str, Any]) -> bool:
     return (
         _matches(effect["category"], scope["categories"])
         and _matches(effect["operation"], scope["operations"])
-        and all(_matches(target, scope["targets"]) for target in effect["targets"])
+        and all(_target_matches(target, scope["targets"]) for target in effect["targets"])
     )
 
 

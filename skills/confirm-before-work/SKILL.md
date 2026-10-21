@@ -91,9 +91,11 @@ Use this concise structure:
 - What is still unclear, if anything
 - Confirmation request
 
-The target list may use a clearly bounded pattern such as
-`src/**/*.ts`, but do not hide an unknown or unbounded scope behind a broad
-pattern.
+The target list may use a clearly bounded pattern such as `src/**/*.ts`. For
+path-like targets, `*` matches within one path segment and never crosses a
+directory boundary; `**` may match multiple path segments. Reject targets with
+`..` path segments and reject unbounded target patterns such as `*`, `**`, or
+`**/*`.
 
 ## Examples
 

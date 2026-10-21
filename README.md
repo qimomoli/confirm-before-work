@@ -95,8 +95,10 @@ What is still unclear:
 Please confirm before I perform this action.
 ```
 
-The target list may use a clearly bounded pattern such as `src/**/*.ts`, but
-the agent should not hide an unknown or unbounded scope behind a broad pattern.
+The target list may use a clearly bounded pattern such as `src/**/*.ts`. For
+path-like targets, `*` matches within one path segment and `**` may span
+multiple segments. Parent-directory (`..`) segments and unbounded target
+patterns such as `*`, `**`, and `**/*` are invalid.
 
 ## Examples
 
